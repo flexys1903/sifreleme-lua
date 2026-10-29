@@ -11,7 +11,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
         }
 
-        /* ARKA PLAN GÖRSELİ (GitHub reposundaki yerel dosya yolu) */
+        /* ARKA PLAN GÖRSELİ */
         body { 
             background: #191816 url('arkaplan.jpg') no-repeat center center fixed;
             background-size: cover;
@@ -23,7 +23,7 @@
             position: relative;
         }
 
-        /* Arka plan görselinin üstüne şeffaf koyu/bej katman */
+        /* Arka plan katmanı */
         body::before {
             content: '';
             position: absolute;
@@ -32,7 +32,7 @@
             z-index: 0;
         }
 
-        header, .tab-bar, .main-container, .status-bar {
+        header, .tab-bar, .main-container, .status-bar, #loginOverlay {
             position: relative;
             z-index: 1;
         }
@@ -59,8 +59,79 @@
             border-radius: 4px; 
             font-size: 12px; 
         }
-        
-        /* Sekmeler */
+
+        /* GİRİŞ EKRANI (LOGIN OVERLAY) */
+        #loginOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(18, 17, 15, 0.95);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-card {
+            background: #24221f;
+            border: 1px solid #3c3935;
+            padding: 30px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .login-card h2 {
+            font-size: 18px;
+            color: #e6dfd5;
+            margin-bottom: 10px;
+        }
+
+        .login-card p {
+            font-size: 13px;
+            color: #a39c93;
+            margin-bottom: 20px;
+        }
+
+        .login-card input[type="password"] {
+            width: 100%;
+            background: #141311;
+            color: #d6ccbe;
+            border: 1px solid #544e47;
+            padding: 10px;
+            border-radius: 5px;
+            outline: none;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .login-card button {
+            width: 100%;
+            padding: 10px;
+            background: #5c554c;
+            border: 1px solid #8c857b;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .login-card button:hover {
+            background: #736c63;
+        }
+
+        .error-msg {
+            color: #d98282;
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* SEKME VE PANEL APİLERİ */
         .tab-bar { display: flex; gap: 10px; margin-top: 15px; }
         .tab-btn { 
             background: #24221f; 
@@ -150,6 +221,8 @@
         button.primary:hover { background: #736c63; }
         button.success { background: #3e4439; border-color: #636d5b; color: #b5c4ab; }
         button.success:hover { background: #4f5749; color: #fff; }
+        button.danger { background: #4a2828; border-color: #733c3c; color: #e6a5a5; }
+        button.danger:hover { background: #633333; }
         
         .status-bar { 
             margin-top: 15px; 
@@ -169,9 +242,23 @@
 </head>
 <body>
 
+    <!-- GİRİŞ EKRANI PENCERESİ -->
+    <div id="loginOverlay">
+        <div class="login-card">
+            <h2>🔒 Delta Eşleme Erişimi</h2>
+            <p>Devam etmek için erişim şifresini girin.</p>
+            <input type="password" id="passInput" placeholder="Şifre" onkeypress="handleKeyPress(event)">
+            <button onclick="checkPassword()">Giriş Yap</button>
+            <div class="error-msg" id="errorMsg">Hatalı şifre! Lütfen tekrar deneyin.</div>
+        </div>
+    </div>
+
     <header>
-        <h1>⚡ Delta Lua Şifreleyici & Çözücü <span class="badge">v2.1 GitHub Sürüm</span></h1>
-        <div style="font-size: 13px; color: #a39c93;">Roblox Lua kodlarını gerçek zamanlı şifrele ve şifrelerini çöz!</div>
+        <h1>⚡ Delta Lua Şifreleyici & Çözücü <span class="badge">v2.2 Env Korumalı</span></h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="font-size: 13px; color: #a39c93;">Roblox Lua kodlarını gerçek zamanlı şifrele ve şifrelerini çöz!</div>
+            <button class="danger" style="padding: 4px 10px; font-size: 11px;" onclick="logout()">Çıkış Yap</button>
+        </div>
     </header>
 
     <!-- SEKME BUTONLARI -->
@@ -243,7 +330,40 @@
     <div class="status-bar" id="statusBar">Hazır. Bir işlem seçip başlatabilirsiniz.</div>
 
     <script>
+        // GitHub Actions / Env seviyesinde giriş şifresi (varsayılan: 1903)
+        const SITE_PASSWORD = window.ENV_LOGIN_PASSWORD || "1903";
         const GLOBAL_ENV_SALT = window.ENV_SECRET_KEY || "DELTA_DEFAULT_SALT_2026";
+
+        // Sayfa Yüklendiğinde Oturum Kontrolü
+        window.onload = function() {
+            if (sessionStorage.getItem("delta_auth") === "true") {
+                document.getElementById("loginOverlay").style.display = "none";
+            }
+        };
+
+        function checkPassword() {
+            const enteredPass = document.getElementById("passInput").value;
+            const err = document.getElementById("errorMsg");
+            
+            if (enteredPass === SITE_PASSWORD) {
+                sessionStorage.setItem("delta_auth", "true");
+                document.getElementById("loginOverlay").style.display = "none";
+                err.style.display = "none";
+            } else {
+                err.style.display = "block";
+            }
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === "Enter") {
+                checkPassword();
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem("delta_auth");
+            location.reload();
+        }
 
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -252,6 +372,7 @@
             btn.classList.add('active');
         }
 
+        // --- ŞİFRELEME MOTORU ---
         function convertLua() {
             const input = document.getElementById('rawInput').value.trim();
             const mode = document.getElementById('modeSelect').value;
@@ -300,6 +421,7 @@
             return `--[[ Encrypted with Delta Hex Engine ]]--\nlocal _hex = "${hexArr.join("")}"\n(loadstring or load)(_hex)()`;
         }
 
+        // --- ŞİFRE ÇÖZME MOTORU ---
         function decodeLua() {
             const input = document.getElementById('encodedInput').value.trim();
             const outputArea = document.getElementById('decodedOutput');
